@@ -1,0 +1,15 @@
+{
+  "manager_url": "https://gpu.example.com",
+  "kernel_ref": "YOUR_KAGGLE_USERNAME/managed-qwen-server",
+  "kernel_title": "Managed Qwen Server",
+  "accelerator": "NvidiaTeslaT4",
+  "dataset_sources": ["tahsinekajolasalami/qwen36-35b-a3b-gguf", "tahsinekajolasalami/llama-cpp-bin"],
+  "model_glob": "**/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+  "mmproj_glob": "**/mmproj-F16.gguf",
+  "binary_glob": "**/llama-server",
+  "model_alias": "qwen3.6-35b-a3b",
+  "context_size": 8192,
+  "max_minutes": 710,
+  "tunnel_mode": "named",
+  "model_url": "https://llm.example.com"
+}

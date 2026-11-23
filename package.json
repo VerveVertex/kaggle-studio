@@ -1,0 +1,22 @@
+{
+  "name": "kaggle-studio",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test tests/setup.test.mjs tests/maintenance.test.mjs",
+    "test:ui": "node tests/ui-check.mjs",
+    "build:artifact": "node scripts/build-artifact.mjs",
+    "test:regression": "node scripts/prepare-ui.mjs && node tests/ui-language.mjs && node tests/ui-pairing.mjs && node tests/ui-cleanup-timing.mjs",
+    "test:manual-ui": "node tests/ui-manual-token.mjs"
+  },
+  "devDependencies": {
+    "happy-dom": "21.0.4",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "esbuild": "0.28.2"
+  }
+}

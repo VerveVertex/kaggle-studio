@@ -1,0 +1,8 @@
+// Pin upstream model snapshots; model code is never loaded with trust_remote_code.
+export const MEDIA_PROFILES=[
+ {id:'sdxl-t4-v1',kind:'image',title:'SDXL 1.0 · Image · T4',family:'sdxl',alias:'sdxl-1.0',repo:'stabilityai/stable-diffusion-xl-base-1.0',revision:'462165984030d82259a11f4367a4eed129e94a7b',experimental:false},
+ {id:'zimage-turbo-t4-v1',kind:'image',title:'Z-Image-Turbo · Image · T4 · NF4/FP32',family:'zimage',alias:'z-image-turbo',repo:'Tongyi-MAI/Z-Image-Turbo',revision:'f332072aa78be7aecdf3ee76d5c247082da564a6',experimental:true},
+ {id:'wan21-t4-v1',kind:'video',title:'Wan2.1 1.3B · Video 480p · T4',family:'wan21',alias:'wan2.1-1.3b',repo:'Wan-AI/Wan2.1-T2V-1.3B-Diffusers',revision:'0fad780a534b6463e45facd96134c9f345acfa5b',experimental:false},
+ {id:'wan22-t4-v1',kind:'video',title:'Wan2.2 5B · Text / image to video',family:'wan22',alias:'wan2.2-5b',repo:'Wan-AI/Wan2.2-TI2V-5B-Diffusers',revision:'b8fff7315c768468a5333511427288870b2e9635',experimental:true}
+];
+export function bundleProfiles(primary,extras,context){if(!primary?.config)throw Error('Select a model template.');const list=[primary,...extras.filter(p=>p.id!==primary.id)],seen=new Set();const models=list.filter(p=>{if(seen.has(p.config.model_alias))return false;seen.add(p.config.model_alias);return true}).map(p=>{const {model_profiles,...cfg}=p.config;return {id:cfg.model_alias,title:p.title,kind:p.kind||cfg.model_kind||'chat',config:{...cfg,context_size:(p.kind||cfg.model_kind||'chat')==='chat'?(p.id===primary.id?context:Math.max(65536,cfg.context_size||65536)):65536}}});return {...primary,config:{...models[0].config,model_profiles:models}}}

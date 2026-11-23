@@ -1,0 +1,36 @@
+import {Window} from 'happy-dom';
+import React,{act} from 'react';
+import {createRoot} from 'react-dom/client';
+import assert from 'node:assert/strict';
+const window=new Window({url:'https://appassets.androidplatform.net/'});
+for(const key of ['window','document','navigator','HTMLElement','Element','Node','localStorage','sessionStorage','MutationObserver','ResizeObserver','getComputedStyle','requestAnimationFrame','cancelAnimationFrame']){
+ if(window[key])Object.defineProperty(globalThis,key,{value:typeof window[key]==='function'&&['getComputedStyle','requestAnimationFrame','cancelAnimationFrame'].includes(key)?window[key].bind(window):window[key],configurable:true});
+}
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const preferences={connectionSchema:2,language:'en',modelUrl:'https://model.example.com/v1',managerUrl:'https://gpu.example.com',modelId:'custom/model-id',theme:'light',streaming:true};
+localStorage.setItem('studio-preferences',JSON.stringify(preferences));
+sessionStorage.setItem('studio-keys',JSON.stringify({modelKey:'test-model-key',managerKey:'test-admin-key'}));
+globalThis.fetch=async()=>Response.json({error:'Offline fixture'},{status:503});
+const {default:App}=await import('../test-build/app-test.mjs');
+const root=createRoot(document.body.appendChild(document.createElement('div')));
+await act(async()=>root.render(React.createElement(App)));
+const click=async label=>{const button=[...document.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')===label||b.textContent.trim()===label);assert(button,'Button missing: '+label);await act(async()=>button.click());};
+await click('Open settings');
+let language=document.querySelector('select[aria-label="Language"]');assert(language);
+await act(async()=>{language.value='zh-CN';language.dispatchEvent(new window.Event('change',{bubbles:true}));});
+assert(document.body.textContent.includes('偏好设置'));assert(document.querySelector('[aria-label="语言"]'));
+assert.equal(document.documentElement.lang,'zh-CN');
+await click('连接');assert(document.body.textContent.includes('管理部署 / 修改 Token 与模型'));assert(document.body.textContent.includes('测试连接'));assert.equal(document.querySelector('input[value="https://model.example.com/v1"]')?.value,preferences.modelUrl);
+assert.equal(JSON.parse(localStorage.getItem('studio-preferences')).language,'zh-CN');
+assert.equal(JSON.parse(sessionStorage.getItem('studio-keys')).modelKey,'test-model-key');
+await click('通用');language=document.querySelector('select[aria-label="语言"]');
+await act(async()=>{language.value='en';language.dispatchEvent(new window.Event('change',{bubbles:true}));});
+assert(document.body.textContent.includes('Preferences'));assert(document.querySelector('[aria-label="Language"]'));assert.equal(document.documentElement.lang,'en-US');
+await act(async()=>root.unmount());
+const root2=createRoot(document.body.appendChild(document.createElement('div')));
+const persisted=JSON.parse(localStorage.getItem('studio-preferences'));persisted.language='zh-CN';localStorage.setItem('studio-preferences',JSON.stringify(persisted));
+await act(async()=>root2.render(React.createElement(App)));
+await click('打开设置');assert(document.querySelector('[aria-label="语言"]'));await click('连接');
+assert.equal(document.querySelector('input[value="https://model.example.com/v1"]')?.value,preferences.modelUrl);
+await act(async()=>root2.unmount());await window.happyDOM.close();
+console.log('PASS: real React settings toggled English → Chinese → English; Chinese persisted through remount, addresses and keys retained.');

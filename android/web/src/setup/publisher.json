@@ -1,0 +1,22 @@
+{
+  "releaseEnabled": true,
+  "cloudflare": {
+    "clientId": "235e65c822ab84b9ee6439a025193c76",
+    "redirectUri": "http://localhost:8765/oauth/cloudflare",
+    "scopes": [
+      "d1.write",
+      "workers-scripts.admin",
+      "teams-connectors.write",
+      "connectivity-directory.admin"
+    ]
+  },
+  "kaggle": {
+    "clientId": "",
+    "redirectUri": "http://localhost:8765/oauth/kaggle",
+    "authMode": "api_token"
+  },
+  "testingEnabled": false,
+  "releaseChannel": "public",
+  "minimumManagerBuild": "0.3.0",
+  "website": "https://studio.entropy1221.cc.cd"
+}

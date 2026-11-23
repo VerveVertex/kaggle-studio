@@ -1,0 +1,38 @@
+import {Window} from 'happy-dom';
+import React,{act} from 'react';
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import {readFileSync} from 'node:fs';
+import {harness,auth} from './provider-fixture.mjs';
+const require=createRequire(new URL('../android/web/package.json',import.meta.url));
+await require('esbuild').build({entryPoints:[new URL('../android/web/src/setup/SetupWizard.jsx',import.meta.url).pathname],outfile:new URL('../test-build/manual-wizard.mjs',import.meta.url).pathname,bundle:true,platform:'node',format:'esm',external:['react','react/*','react-dom','react-dom/*'],jsx:'automatic',banner:{js:"import {createRequire as __req} from 'node:module';const require=__req(import.meta.url);"}});
+const w=new Window({url:'https://appassets.androidplatform.net/'});
+for(const k of ['window','document','navigator','HTMLElement','HTMLInputElement','Element','Node','localStorage','sessionStorage','MutationObserver','ResizeObserver','getComputedStyle','requestAnimationFrame','cancelAnimationFrame'])if(w[k])Object.defineProperty(globalThis,k,{value:['getComputedStyle','requestAnimationFrame','cancelAnimationFrame'].includes(k)?w[k].bind(w):w[k],configurable:true});
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const {createRoot}=await import('react-dom/client');
+let vault={},keys={imageKey:'independent-fixture-key'},callbackState='',closed=false,connected=null,invalid=true,username='tester';
+globalThis.StudioNative={readSetup:()=>JSON.stringify(vault),saveSetup:raw=>{vault=JSON.parse(raw);return true},readKeys:()=>JSON.stringify(keys),saveKeys:raw=>{keys=JSON.parse(raw);return true},beginOAuthCallback:(state,provider)=>{assert.equal(provider,'cloudflare','manual mode must not begin Kaggle OAuth');callbackState=state;return JSON.stringify({redirect_uri:'http://localhost:8765/oauth/cloudflare'})},readOAuthCallback:()=>JSON.stringify({state:callbackState,status:'complete',code:'test-only'}),cancelOAuthCallback:()=>{}};w.open=()=>{};
+const {default:Wizard}=await import('../test-build/manual-wizard.mjs');
+const config=JSON.parse(readFileSync(new URL('../android/web/src/setup/publisher.json',import.meta.url)));assert.equal(config.releaseEnabled,true);assert.equal(config.testingEnabled,false);assert.equal(config.kaggle.clientId,'');
+const h=harness(),token='KGAT_'+'a'.repeat(32);let introspections=0;
+const transport=async(url,o)=>{
+ if(url==='https://dash.cloudflare.com/oauth2/token')return Response.json({access_token:auth.accessToken,token_type:'Bearer',expires_in:3600,scope:config.cloudflare.scopes.join(' ')});
+ if(url==='https://dash.cloudflare.com/oauth2/revoke')return new Response('');
+ if(url==='https://api.kaggle.com/v1/security.OAuthService/IntrospectToken'){introspections++;assert.equal(JSON.parse(o.body).token,token);return invalid?Response.json({error:token},{status:401}):Response.json({active:true,username});}
+ assert(!url.startsWith('https://www.kaggle.com/api/v1/oauth2/'),'no Kaggle OAuth in token mode');return h.transport(url,o);
+};
+const root=createRoot(document.body.appendChild(document.createElement('div')));
+await act(async()=>root.render(React.createElement(Wizard,{language:'zh-CN',config,transport,onClose:()=>{closed=true},onConnected:async data=>{connected=data;assert.equal(keys.managerKey,data.manager_key)}})));
+const click=async label=>{const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()===label&&!x.disabled);assert(b,'Missing enabled button: '+label);await act(async()=>{b.click();await new Promise(r=>setTimeout(r,50))})};
+const fill=async value=>{const input=document.querySelector('input[type=password]');assert(input);await act(async()=>{const setter=Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype,'value').set;setter.call(input,value);input.dispatchEvent(new w.Event('input',{bubbles:true}));input.dispatchEvent(new w.Event('change',{bubbles:true}));});};
+assert(!document.body.textContent.includes('私有账户测试版'));assert(document.body.textContent.includes('隐私与账户授权说明'));assert.equal([...document.querySelectorAll('.setup-provider button')].length,1);
+assert(!document.querySelector('input[type=password]'));await click('登录');await click('检查登录');assert(!document.querySelector('input[type=password]'));await click('下一步');await fill(token);await click('上一步');await click('下一步');assert.equal(document.querySelector('input[type=password]').value,token);await click('验证并继续');
+assert.equal(introspections,1);assert(!vault.kaggle);assert.deepEqual(h.creates,{});assert(!document.querySelector('[role=alert]').textContent.includes(token));
+invalid=false;await click('验证并继续');assert.equal(vault.kaggle.kind,'api_token');assert.equal(vault.identity.username,'tester');assert.equal(document.querySelector('input[type=password]'),null);
+assert(!document.body.textContent.includes(token));assert(!localStorage.getItem('studio-preferences'));
+await click('上一步');assert.equal(document.querySelector('input[type=password]').value,token);await click('验证并继续');
+await click('构建我的工作空间');assert.equal(vault.plan.step,11);assert.equal(h.env.KAGGLE_API_TOKEN,token);assert.equal(h.env.KAGGLE_CREDENTIALS_KEY,undefined);
+assert.equal((await h.env.DB.prepare('SELECT count(*) AS n FROM provider_credentials').first()).n,0);
+await click('进入 Studio');assert(closed);assert(connected.manager_url.endsWith('.workers.dev'));assert.equal(keys.imageKey,'independent-fixture-key');assert.deepEqual(vault,{});assert(!localStorage.getItem('studio-preferences').includes(token));
+await act(async()=>root.unmount());await w.happyDOM.close();
+console.log('PASS: token-only Kaggle setup without a Kaggle client ID; invalid token created no resources; username auto-read; token stored only as Worker Secret; no token in source, D1, DOM or preferences; setup vault cleared after connection.');

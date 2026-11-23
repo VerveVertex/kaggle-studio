@@ -1,0 +1,24 @@
+name = "kaggle-gpu-manager"
+main = "src/worker.js"
+compatibility_date = "2026-11-20"
+workers_dev = true
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = true
+
+[[rules]]
+type = "Text"
+globs = ["**/*.py"]
+fallthrough = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kaggle-gpu-manager"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+# After initial deployment, add the panel hostname here or use the dashboard.
+# [[routes]]
+# pattern = "gpu.example.com"
+# custom_domain = true

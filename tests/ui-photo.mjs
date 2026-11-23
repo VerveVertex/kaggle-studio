@@ -1,0 +1,25 @@
+import {Window} from 'happy-dom';
+import React,{act} from 'react';
+import assert from 'node:assert/strict';
+const w=new Window({url:'https://appassets.androidplatform.net/'});
+for(const k of ['window','document','navigator','HTMLElement','Element','Node','localStorage','sessionStorage','MutationObserver','ResizeObserver','getComputedStyle','requestAnimationFrame','cancelAnimationFrame'])if(w[k])Object.defineProperty(globalThis,k,{value:['getComputedStyle','requestAnimationFrame','cancelAnimationFrame'].includes(k)?w[k].bind(w):w[k],configurable:true});
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+localStorage.setItem('studio-preferences',JSON.stringify({connectionSchema:2,language:'zh-CN',modelUrl:'https://model.example.com/v1',modelId:'qwen-vision',streaming:false}));sessionStorage.setItem('studio-keys',JSON.stringify({modelKey:'fixture-model-key'}));
+let payload,cleaned='',opened=0;globalThis.fetch=async(url,o)=>{assert(String(url).endsWith('/chat/completions'));payload=JSON.parse(o.body);return Response.json({choices:[{message:{content:'照片中是一只猫。'}}]})};
+const {createRoot}=await import('react-dom/client'),{default:App}=await import('../test-build/app-test.mjs');
+// The native transport was intentionally absent at module initialization; only capture cleanup is mocked.
+globalThis.StudioNative={finishCapture:name=>{cleaned=name}};
+const root=createRoot(document.body.appendChild(document.createElement('div')));
+await act(async()=>{root.render(React.createElement(App));await new Promise(r=>setTimeout(r,20))});
+const capture=document.querySelector('input[capture="environment"]');assert(capture);capture.click=()=>{opened++};
+const photoButton=document.querySelector('button[aria-label="拍照"]');assert(photoButton&&!photoButton.disabled);await act(async()=>photoButton.click());assert.equal(opened,1);
+const oldImage=globalThis.Image,oldCreate=URL.createObjectURL,oldRevoke=URL.revokeObjectURL,oldCanvas=w.HTMLCanvasElement.prototype.getContext,oldData=w.HTMLCanvasElement.prototype.toDataURL;
+globalThis.Image=class{naturalWidth=3000;naturalHeight=4000;set src(v){queueMicrotask(()=>this.onload())}};URL.createObjectURL=()=> 'blob:test-photo';URL.revokeObjectURL=()=>{};
+w.HTMLCanvasElement.prototype.getContext=()=>({drawImage(){},fillRect(){}});w.HTMLCanvasElement.prototype.toDataURL=()=> 'data:image/jpeg;base64,Y2FtZXJh';
+const file=new w.File(['fixture'],'studio-camera-12345678-1234-1234-1234-123456789abc.jpg',{type:'image/jpeg'});Object.defineProperty(capture,'files',{value:[file],configurable:true});
+await act(async()=>{capture.dispatchEvent(new w.Event('change',{bubbles:true}));await new Promise(r=>setTimeout(r,20))});assert.equal(cleaned,file.name);assert(document.querySelector('.attachment-preview img'));assert.equal(payload,undefined,'Photos are not sent until the user sends the question');
+const textarea=document.querySelector('textarea');await act(async()=>{Object.getOwnPropertyDescriptor(w.HTMLTextAreaElement.prototype,'value').set.call(textarea,'照片里是什么？');textarea.dispatchEvent(new w.Event('input',{bubbles:true}));textarea.dispatchEvent(new w.Event('change',{bubbles:true}))});
+await act(async()=>{document.querySelector('form.composer').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,40))});
+assert.equal(payload.model,'qwen-vision');assert(payload.messages.at(-1).content.some(p=>p.type==='image_url'&&p.image_url.url==='data:image/jpeg;base64,Y2FtZXJh'));assert(document.body.textContent.includes('照片中是一只猫。'));
+await act(async()=>root.unmount());await w.happyDOM.close();globalThis.Image=oldImage;URL.createObjectURL=oldCreate;URL.revokeObjectURL=oldRevoke;w.HTMLCanvasElement.prototype.getContext=oldCanvas;w.HTMLCanvasElement.prototype.toDataURL=oldData;delete globalThis.StudioNative;
+console.log('PASS: Chinese camera button invokes capture input; compressed photo previews locally, temporary capture is released, and explicit Send carries image+question to the vision model.');

@@ -1,0 +1,20 @@
+import {readFileSync,existsSync} from 'node:fs';
+import {Window} from 'happy-dom';
+import assert from 'node:assert/strict';
+const root=new URL('../publisher/build/',import.meta.url),html=readFileSync(new URL('index.html',root),'utf8');
+const window=new Window({url:'https://studio.example.com/'});window.document.write(html);
+const document=window.document;
+for(const script of ['language.js','showcase.js'])window.eval(readFileSync(new URL(script,root),'utf8'));
+const tabs=[...document.querySelectorAll('[role=tab]')],panels=[...document.querySelectorAll('[role=tabpanel]')];
+assert.equal(tabs.length,3);assert.equal(panels.filter(p=>!p.hidden).length,1);
+tabs[1].click();assert.equal(tabs[1].getAttribute('aria-selected'),'true');assert.equal(panels.find(p=>!p.hidden).id,'panel-image');
+tabs[1].dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));assert.equal(panels.find(p=>!p.hidden).id,'panel-video');assert.equal(document.activeElement,tabs[2]);
+tabs[2].dispatchEvent(new window.KeyboardEvent('keydown',{key:'Home',bubbles:true}));assert.equal(panels.find(p=>!p.hidden).id,'panel-chat');
+const before=document.documentElement.lang;document.getElementById('language').click();assert.notEqual(document.documentElement.lang,before);assert.equal(panels.filter(p=>!p.hidden).length,1);
+assert(!document.querySelector('.ownership h2').textContent.includes('\\n'));
+for(const a of document.querySelectorAll('a[href^="/"]')){const path=a.getAttribute('href').split('#')[0]||'/';assert(existsSync(new URL(path==='/'?'index.html':path.slice(1),root)),path)}
+for(const word of ['支持中文和英语','切换中文和英语','最终版','最终发布版','私人测试版'])assert(!document.body.textContent.includes(word));
+assert.equal(document.querySelectorAll('h1').length,1);
+assert(document.querySelector('[download]'));assert(!document.querySelector('[src^="https://"]'));
+assert(readFileSync(new URL('style.css',root),'utf8').includes('prefers-reduced-motion'));
+await window.happyDOM.close();console.log('PASS: website tabs, keyboard navigation, language persistence, headings, downloads, local links, reduced motion and removed generic promotion.');

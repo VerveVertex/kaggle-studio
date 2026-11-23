@@ -1,0 +1,4 @@
+ADMIN_TOKEN=replace-with-a-random-admin-token-at-least-24-characters
+MODEL_API_KEY=replace-with-a-different-random-model-key-at-least-24-characters
+KAGGLE_API_TOKEN=KGAT_replace_with_your_token
+CF_TUNNEL_TOKEN=replace_with_your_named_tunnel_token
